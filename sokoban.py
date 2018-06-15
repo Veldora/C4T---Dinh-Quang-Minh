@@ -162,26 +162,36 @@ while play == 1:
                     wall_is_here = True
             if x == player["x"] and y == player["y"]:
                 player_is_here = True
+
             if box_is_here:
                 print("B", end=" ")
+            elif player_is_here:
+                print("P", end=" ")
             elif destinations_is_here:
                 print("D", end=" ")
             elif wall_is_here:
                 print("|", end=" ")
-            elif player_is_here:
-                print("P", end=" ")
+            
             else:
                 print("-", end=" ")
         print()
 
-    destination_require = 0
+    
+    destination_require_list = []
     for destination in range(len(destinations)):
-        if destinations[destination]["x"] == 100 and destinations[destination]["y"] == 100:
-            destination_require = 1
-        else:
-            destination_require = 0
-            break
+        des = 0
+        for box in range(len(boxes)):
+            if destinations[destination] == boxes[box]:
+                destination_require_list.append(1)
+                des = 1
+        if des == 0:
+            destination_require_list.append(0)
 
+    destination_require = 1
+    for d in range(len(destination_require_list)):
+        if destination_require_list[d] == 0:
+            destination_require = 0
+    
     if destination_require == 1:
         print()
         
@@ -596,9 +606,9 @@ while play == 1:
         wall = []
             
     if px != 100 or py != 100:
-        for destination in range(len(destinations)):
-            if destinations[destination]["x"] == px and destinations[destination]["y"] == py:
-                require = 1
+##        for destination in range(len(destinations)):
+##            if destinations[destination]["x"] == px and destinations[destination]["y"] == py:
+##                require = 1
 
         for walls in range(len(wall)):
             if wall[walls]["x"] == px and wall[walls]["y"] == py:
@@ -653,8 +663,8 @@ while play == 1:
                     boxes[player_hit_box]["x"] = bx
                     player["y"] = py
                     player["x"] = px
-                    destinations[destination]["x"] = 100
-                    destinations[destination]["y"] = 100
+##                    destinations[destination]["x"] = 100
+##                    destinations[destination]["y"] = 100
                     require = 1
             for box in range(len(boxes)):
                 if boxes[box]["x"] == bx and boxes[box]["y"] == by:
