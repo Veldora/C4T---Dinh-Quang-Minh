@@ -437,6 +437,7 @@ while play == 1:
 
                     destinations[i]["x"] = dix
                     destinations[i]["y"] = diy
+                wall = []
             
 
     if move_able == 1:
