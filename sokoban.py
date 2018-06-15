@@ -593,6 +593,7 @@ while play == 1:
 
             destinations[i]["x"] = dix
             destinations[i]["y"] = diy
+        wall = []
             
     if px != 100 or py != 100:
         for destination in range(len(destinations)):
