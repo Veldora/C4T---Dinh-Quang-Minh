@@ -1,5 +1,6 @@
 import pygame
 import random
+import sys
 from pygame.locals import *
 
 
@@ -14,7 +15,6 @@ GREEN = (0, 255, 0)
 YELLOW = (255, 140, 0)
 WHITE = (255, 255, 255)
 
-fps = 10   # so frame tren giay
 fps_clock = pygame.time.Clock()
 
 
@@ -38,17 +38,18 @@ class Snake:
 
     def draw(self):
         for element in self.elements_position:
-            pygame.draw.circle(display_surf, GREEN, tuple(element), self.radius)
+            center = map(int, element)
+            pygame.draw.circle(display_surf, GREEN, tuple(center), self.radius)
 
     def move(self, direction):
         if direction == "forward":
-            self.elements_position.append(self.elements_position[-1][0], self.elements_position[-1][1] - 2*self.radius)
+            self.elements_position.append([self.elements_position[-1][0], self.elements_position[-1][1] - 2*self.radius])
         elif direction == "backward":
-            self.elements_position.append(self.elements_position[-1][0], self.elements_position[-1][1] + 2*self.radius)
+            self.elements_position.append([self.elements_position[-1][0], self.elements_position[-1][1] + 2*self.radius])
         elif direction == "left":
-            self.elements_position.append(self.elements_position[-1][0] - 2*self.radius, self.elements_position[-1][1])
+            self.elements_position.append([self.elements_position[-1][0] - 2*self.radius, self.elements_position[-1][1]])
         if direction == "right":
-            self.elements_position.append(self.elements_position[-1][0] + 2*self.radius, self.elements_position[-1][1])
+            self.elements_position.append([self.elements_position[-1][0] + 2*self.radius, self.elements_position[-1][1]])
         self.extension = self.elements_position[0]
         self.elements_position.pop(0)
 
@@ -58,22 +59,23 @@ class Snake:
         food.y = random.randrange(10, height - 9)
 
     def hit_food(self, food):
-        if self.elements_position[-1] == [food.x, food.y]:
+        if float(food.x) + float(self.radius + food.r) >= self.elements_position[-1][0] >= float(food.x) - float(self.radius + food.r) \
+                and float(food.y) + float(self.radius + food.r) >= self.elements_position[-1][1] >= float(food.y) - float(self.radius + food.r):
             return True
         else:
             return False
 
     def hit_wall(self):
-        if self.elements_position[-1][0] == 0 or self.elements_position[-1][0] == width \
-                or self.elements_position[-1][1] == 0 or self.elements_position[-1][1] == height:
+        if int(self.elements_position[-1][0]) <= 0 or int(self.elements_position[-1][0]) >= width \
+                or int(self.elements_position[-1][1]) <= 0 or int(self.elements_position[-1][1]) >= height:
             return True
         else:
             return False
 
     def hit_snake(self):
         hit = False
-        for element in self.elements_position:
-            if self.elements_position[-1] == element:
+        for element in range(len(self.elements_position) - 1):
+            if self.elements_position[-1] == self.elements_position[element]:
                 hit = True
                 break
         if hit:
@@ -96,42 +98,44 @@ class Game:
         self.food.draw()
 
     def update(self, _fps, direction):
-        for i in range(len(self.snake.elements_position)):
-            self.snake.elements_position[i][0] = int(self.snake.elements_position[i][0])
-            self.snake.elements_position[i][1] = int(self.snake.elements_position[i][1])
         if self.snake.hit_food(self.food):
             self.snake.eat(self.food)
-            _fps += 5
+            _fps += 1
         self.snake.move(direction)
         pygame.display.update()
         fps_clock.tick(_fps)
+        return _fps
 
 
 def main():
     pygame.init()
 
+    fps = 5
     direction = "right"
-    player = Snake([width/2, height/2], 10)
+    player = Snake([[width/2, height/2]], 10)
     food = Food(random.randrange(10, width - 9), random.randrange(10, height - 9), 10)
     game = Game(10, player, food)
-
-    for i in range(len(player.elements_position)):
-        player.elements_position[i][0] = int(player.elements_position[i][0])
-        player.elements_position[i][1] = int(player.elements_position[i][1])
+    die = False
 
     while True:
+        if player.hit_wall() or player.hit_snake():
+            die = True
         for event in pygame.event.get():
-            if event.type == pygame.QUIT or player.hit_wall() or player.hit_snake():
-                pygame.quit()
-            elif event.type == KEYDOWN and event.key == K_a:
+            if event.type == pygame.QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+                die = True
+            elif event.type == KEYDOWN and event.key == K_a and direction != "right":
                 direction = "left"
-            elif event.type == KEYDOWN and event.key == K_d:
+            elif event.type == KEYDOWN and event.key == K_d and direction != "left":
                 direction = "right"
-            elif event.type == KEYDOWN and event.key == K_w:
+            elif event.type == KEYDOWN and event.key == K_w and direction != "backward":
                 direction = "forward"
-            elif event.type == KEYDOWN and event.key == K_s:
+            elif event.type == KEYDOWN and event.key == K_s and direction != "forward":
                 direction = "backward"
-        game.update(fps, direction)
+        if die:
+            pygame.quit()
+            sys.exit()
+        game.draw_arena()
+        fps = game.update(fps, direction)
 
 
 if __name__ == '__main__':
