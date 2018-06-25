@@ -9,23 +9,26 @@ BLACK = (0, 0, 0)
 
 width = 1067
 height = 600
+
 # tao khung hien thi game
+icon_surf = pygame.image.load(os.path.join('data', 'icon.png'))
 display_surf = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Game Shooter")
+pygame.display.set_icon(icon_surf)
 
-fps = 5  # so frame tren giay
 fps_clock = pygame.time.Clock()
 
 
 class Chicken:
 
-    def __init__(self, x, y, radius):
+    def __init__(self, x, y, radius, speed):
         self.x = int(x)
         self.y = int(y)
         self.radius = int(radius)
+        self.speed = speed
 
-    def draw(self):
-        pygame.draw.circle(display_surf, WHITE, (self.x, self.y), self.radius)
+    def draw(self, game, img):
+        game.display_image(img, self.x - self.radius - 1, self.y - self.radius - 1, 2 * self.radius + 1, 2 * self.radius + 1)
 
     def check_hit_ship(self, ship):
         if self.x + self.radius >= ship.x >= self.x - self.radius - ship.width \
@@ -40,26 +43,28 @@ class Chicken:
         else:
             return False
 
-    def move(self, speed):
-        self.y += speed
+    def move(self):
+        self.y += self.speed
 
 
 class Bullet:
 
-    def __init__(self, x, y, radius):
+    def __init__(self, x, y, radius, speed):
         self.x = int(x)
         self.y = int(y)
         self.index = 0
         self.radius = int(radius)
+        self.speed = speed
 
-    def draw(self):
-        pygame.draw.circle(display_surf, WHITE, (self.x, self.y), self.radius)
+    def draw(self, game, img):
+        game.display_image(img, self.x - self.radius - 16, self.y - self.radius - 7, 53, 40)
 
-    def check_hit_chicken(self, chickens, bullets, scoreboard):
+    def check_hit_chicken(self, chickens, bullets, scoreboard, game, music):
         for chicken_index, chicken in enumerate(chickens):
-            if chicken.x + self.radius + chicken.radius >= self.x >= chicken.x - self.radius + chicken.radius \
-                    and chicken.y + self.radius + chicken.radius >= self.y >= chicken.y - self.radius + chicken.radius:
+            if chicken.x + self.radius + chicken.radius >= self.x >= chicken.x - self.radius - chicken.radius \
+                    and chicken.y + self.radius + chicken.radius >= self.y >= chicken.y - self.radius - chicken.radius:
                 scoreboard.score += 10
+                game.load_sound(music, 0, 2)
                 chickens.pop(chicken_index)
                 bullets.pop(self.index)
 
@@ -67,33 +72,24 @@ class Bullet:
         if self.y <= 0:
             bullets.pop(self.index)
 
-    def move(self, speed):
-        self.y -= speed
+    def move(self):
+        self.y -= self.speed
 
 
 class Ship:
 
-    def __init__(self, w, h, x, y, speed):
+    def __init__(self, w, h, x, y):
         self.width = int(w)
         self.height = int(h)
         self.x = int(x)
         self.y = int(y)
-        self.dir_x = 0
-        self.dir_y = 0
-        self.speed = int(speed)
 
-    def draw(self):
-        pygame.draw.rect(display_surf, WHITE, (self.x, self.y, self.width, self.height))
+    def draw(self, game, img):
+        game.display_image(img, self.x - 15, self.y - 13, 50, 64)
 
-    def move(self):
-        self.x += self.dir_x * self.speed
-        self.y += self.dir_y * self.speed
-        self.dir_x = 0
-        self.dir_y = 0
-
-    def shoot(self, bullets):
-        bullet = Bullet(self.x, self.y, 10)
-        bullets.append(bullet)
+    def move(self, pos):
+        self.x = pos[0] - self.width/2
+        self.y = pos[1] - self.height/2
 
 
 class Scoreboard:
@@ -120,58 +116,83 @@ class Game:
         self.scoreboard = scoreboard
         self.speed = speed
 
-    def draw_arena(self, background):
+    def draw_arena(self, background, bullet_img, chicken_img, ship_img):
         display_surf.fill(BLACK)
-        self.display_image(background)
-        self.ship.draw()
+        self.display_image(background, 0, 0, width, height)
+        self.ship.draw(self, ship_img)
         for chicken in self.chickens:
-            chicken.draw()
+            chicken.draw(self, chicken_img)
         for bullet in self.bullets:
-            bullet.draw()
+            bullet.draw(self, bullet_img)
         self.scoreboard.display()
 
-    def display_image(self, img):
-        img = pygame.transform.scale(img, (width, height))
-        display_surf.blit(img, (0, 0))
+    def display_image(self, img, x, y, w, h):
+        img = pygame.transform.scale(img, (w, h))
+        display_surf.blit(img, (x, y))
 
     def load_sound(self, music, loop, channel):
         pygame.mixer.Channel(channel).play(music, loop)
 
-    def ship_hit_floor(self):
-        if self.ship.y >= height - self.ship.height:
+    def ship_hit_floor(self, music, check_hit):
+        if self.ship.y > height - self.ship.height:
             self.ship.y = height - self.ship.height
-        elif self.ship.y <= 0:
+            if check_hit:
+                self.load_sound(music, 0, 1)
+                check_hit = False
+        elif self.ship.y < 0:
             self.ship.y = 0
-        elif self.ship.x >= width - self.ship.width:
+            if check_hit:
+                self.load_sound(music, 0, 1)
+                check_hit = False
+        elif self.ship.x > width - self.ship.width:
             self.ship.x = width - self.ship.width
-        elif self.ship.x <= 0:
+            if check_hit:
+                self.load_sound(music, 0, 1)
+                check_hit = False
+        elif self.ship.x < 0:
             self.ship.x = 0
+            if check_hit:
+                self.load_sound(music, 0, 1)
+                check_hit = False
+        else:
+            check_hit = True
+        return check_hit
 
-    def update(self):
+    def update(self, pos, music, hit_wall_sound, check_hit):
         for chicken in self.chickens:
-            chicken.move(3)
+            chicken.move()
         for bullet_index, bullet in enumerate(self.bullets):
             bullet.index = bullet_index
-            bullet.move(3)
+            bullet.move()
             bullet.check_out_of_range(self.bullets)
-            bullet.check_hit_chicken(self.chickens, self.bullets, self.scoreboard)
-        self.ship_hit_floor()
+            bullet.check_hit_chicken(self.chickens, self.bullets, self.scoreboard, self, music)
+        check_hit = self.ship_hit_floor(hit_wall_sound, check_hit)
+        self.ship.move(pos)
+        return check_hit
 
 
 def main():
+    global mouse_pos
     pygame.init()
     high_score = 0
+    start_screen = True
 
+    # load anh va am thanh
     background = pygame.image.load(os.path.join('data', 'background.jpg')).convert()
+    score_display = pygame.image.load(os.path.join('data', 'lose.jpg')).convert()
+    bullet_img = pygame.image.load(os.path.join('data', 'mine-bullet.png')).convert_alpha()
+    chicken_img = pygame.image.load(os.path.join('data', 'chicken.png')).convert_alpha()
+    ship_img = pygame.image.load(os.path.join('data', 'spaceship.png')).convert_alpha()
     game_over_img = pygame.image.load(os.path.join('data', 'game_over.png')).convert()
     start = pygame.image.load(os.path.join('data', 'space_invader.png')).convert()
     hit_wall_sound = pygame.mixer.Sound(os.path.join('data', 'hit_wall.wav'))
+    boom_sound = pygame.mixer.Sound(os.path.join('data', 'boom.wav'))
     game_over_sound = pygame.mixer.Sound(os.path.join('data', 'gameover.wav'))
-    start_screen = True
     music = os.path.join('data', 'techno_house_loop.mp3')
     pygame.mixer.music.load(music)
     pygame.mixer.music.play(-1)
 
+    # man hinh mo dau game
     while start_screen:
         start = pygame.transform.scale(start, (width, height))
         display_surf.blit(start, (0, 0))
@@ -185,31 +206,35 @@ def main():
                 start_screen = False
         pygame.display.update()
 
+    # game
     while True:
-        chicken_cooldown = 700
-        bullet_cooldown = 300
+        fps = 20
+        time_speed = 1
+        chicken_cooldown = 900
+        bullet_cooldown = 800
+        check_fps = True
+        check_last_time = True
+        check_hit = True
         last_time_chicken = pygame.time.get_ticks()
         last_time_bullet = pygame.time.get_ticks()
-        ship = Ship(20, 30, width/2, height/2, 25)
+        ship = Ship(20, 44, width/2, height/2)
         chickens = []
         bullets = []
-        scoreboard = Scoreboard(width - 100, 10, None, 30, 0)
+        scoreboard = Scoreboard(width - 200, 30, None, 40, 0)
         die = False
         play = True
         game = Game(ship, chickens, bullets, scoreboard, 5)
-        a_pressed = False
-        d_pressed = False
-        w_pressed = False
-        s_pressed = False
+        mouse_pos = [width/2, height/2]
 
         while play:
+            # tao object chicken va bullet sau mot khoang thoi gian nhat dinh
             now = pygame.time.get_ticks()
             if now - last_time_chicken >= chicken_cooldown:
-                chicken = Chicken(random.randrange(10, width - 10), 0, 10)
+                chicken = Chicken(random.randrange(10, width - 10), 0, 15, time_speed)
                 chickens.append(chicken)
                 last_time_chicken = now
             elif now - last_time_bullet >= bullet_cooldown:
-                bullet = Bullet(ship.x + ship.width/2, ship.y - 10, 10)
+                bullet = Bullet(ship.x + ship.width/2, ship.y - 10, 10, time_speed)
                 bullets.append(bullet)
                 last_time_bullet = now
             for one in chickens:
@@ -217,63 +242,63 @@ def main():
                     die = True
                     break
 
-            game.draw_arena(background)
-            game.update()
-            pygame.display.update()
-            fps_clock.tick(fps)
-
+            # xu ly su kien
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
                     pygame.quit()
                     sys.exit()
-                if event.type == KEYDOWN:
-                    if event.key == K_a:
-                        a_pressed = True
-                    elif event.key == K_d:
-                        d_pressed = True
-                    elif event.key == K_w:
-                        w_pressed = True
-                    elif event.key == K_s:
-                        s_pressed = True
-                elif event.type == KEYUP:
-                    if event.key == K_a:
-                        a_pressed = False
-                    elif event.key == K_d:
-                        d_pressed = False
-                    elif event.key == K_w:
-                        w_pressed = False
-                    elif event.key == K_s:
-                        s_pressed = False
-            if a_pressed:
-                ship.dir_y = 0
-                ship.dir_x = -1
-            elif d_pressed:
-                ship.dir_y = 0
-                ship.dir_x = 1
-            elif w_pressed:
-                ship.dir_y = -1
-                ship.dir_x = 0
-            elif s_pressed:
-                ship.dir_y = 1
-                ship.dir_x = 0
-            ship.move()
+                elif event.type == MOUSEMOTION:
+                    mouse_pos = pygame.mouse.get_pos()
 
+            # tang speed va giam thoi gian tao object
+            if scoreboard.score != 0 and check_fps:
+                if scoreboard.score % 100 == 0:
+                    fps += 2
+                    check_fps = False
+                elif scoreboard.score % 1000 == 0:
+                    time_speed += 2
+                    check_fps = False
+                else:
+                    check_fps = True
+            if bullet_cooldown > 100:
+                if scoreboard.score % 170 == 0 and check_last_time:
+                    bullet_cooldown -= 50
+                    chicken_cooldown -= 50
+                    check_last_time = False
+                elif scoreboard.score % 170 != 0:
+                    check_last_time = True
+
+            # cap nhat khung hinh
+            game.draw_arena(background, bullet_img, chicken_img, ship_img)
+            check_hit = game.update(mouse_pos, boom_sound, hit_wall_sound, check_hit)
+            pygame.display.update()
+            fps_clock.tick(fps)
+
+            # game over
             if die:
+                # check high score
                 if scoreboard.score > high_score:
                     high_score = scoreboard.score
                 game.load_sound(game_over_sound, 0, 0)
                 display_surf.fill(BLACK)
+
+                # hien thi man hinh game over
                 for i in range(150):
-                    game.display_image(game_over_img)
+                    game.display_image(game_over_img, 0, 0, width, height)
                     pygame.display.update()
+
+                # hien thi man hinh play again
                 display_surf.fill(BLACK)
                 play_again = True
                 while play_again:
+
+                    # hien thi score va high score
+                    game.display_image(score_display, 0, 0, width, height)
                     game_over = pygame.font.Font(None, 120).render("Your score: " + str(scoreboard.score), True, WHITE)
                     high_score_display = pygame.font.Font(None, 50).render("High score: " + str(high_score), True, WHITE)
                     play_again_display = pygame.font.Font(None, 50).render("Play again?(y/n)", True, WHITE)
-                    display_surf.blit(game_over, ((width - game_over.get_width()) // 2, (height - game_over.get_height()) // 2 - 100))
-                    display_surf.blit(high_score_display, ((width - high_score_display.get_width()) // 2, (height - game_over.get_height()) // 2))
+                    display_surf.blit(game_over, ((width - game_over.get_width()) // 2, (height - game_over.get_height()) // 2 - 220))
+                    display_surf.blit(high_score_display, ((width - high_score_display.get_width()) // 2, (height - game_over.get_height()) // 2 - 110))
                     display_surf.blit(play_again_display, ((width - play_again_display.get_width()) // 2, (height - game_over.get_height()) // 2 + 200))
                     for event in pygame.event.get():
                         if event.type == pygame.QUIT or (event.type == KEYDOWN and event.key == K_n):
