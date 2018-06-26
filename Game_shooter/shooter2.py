@@ -55,25 +55,36 @@ class Bullet:
         self.index = 0
         self.radius = int(radius)
         self.speed = speed
+        self.explosion = False
+        self.explosion_time = 0
 
-    def draw(self, game, img):
-        game.display_image(img, self.x - self.radius - 16, self.y - self.radius - 7, 53, 40)
+    def draw(self, game, img, explosion_img):
+        if self.explosion:
+            game.display_image(explosion_img, self.x - self.radius - 10, self.y - self.radius - 10, 40, 40)
+        else:
+            game.display_image(img, self.x - self.radius - 16, self.y - self.radius - 7, 53, 40)
 
-    def check_hit_chicken(self, chickens, bullets, scoreboard, game, music):
+    def check_hit_chicken(self, chickens, scoreboard, game, music):
         for chicken_index, chicken in enumerate(chickens):
             if chicken.x + self.radius + chicken.radius >= self.x >= chicken.x - self.radius - chicken.radius \
                     and chicken.y + self.radius + chicken.radius >= self.y >= chicken.y - self.radius - chicken.radius:
                 scoreboard.score += 10
                 game.load_sound(music, 0, 2)
+                self.explosion = True
+                self.explosion_time = pygame.time.get_ticks()
                 chickens.pop(chicken_index)
-                bullets.pop(self.index)
 
     def check_out_of_range(self, bullets):
         if self.y <= 0:
             bullets.pop(self.index)
 
-    def move(self):
-        self.y -= self.speed
+    def move(self, bullets):
+        if not self.explosion:
+            self.y -= self.speed
+        else:
+            now = pygame.time.get_ticks()
+            if now - self.explosion_time >= 400:
+                bullets.pop(self.index)
 
 
 class Ship:
@@ -116,14 +127,14 @@ class Game:
         self.scoreboard = scoreboard
         self.speed = speed
 
-    def draw_arena(self, background, bullet_img, chicken_img, ship_img):
+    def draw_arena(self, background, bullet_img, chicken_img, ship_img, explosion_img):
         display_surf.fill(BLACK)
         self.display_image(background, 0, 0, width, height)
         self.ship.draw(self, ship_img)
         for chicken in self.chickens:
             chicken.draw(self, chicken_img)
         for bullet in self.bullets:
-            bullet.draw(self, bullet_img)
+            bullet.draw(self, bullet_img, explosion_img)
         self.scoreboard.display()
 
     def display_image(self, img, x, y, w, h):
@@ -163,9 +174,9 @@ class Game:
             chicken.move()
         for bullet_index, bullet in enumerate(self.bullets):
             bullet.index = bullet_index
-            bullet.move()
+            bullet.move(self.bullets)
             bullet.check_out_of_range(self.bullets)
-            bullet.check_hit_chicken(self.chickens, self.bullets, self.scoreboard, self, music)
+            bullet.check_hit_chicken(self.chickens, self.scoreboard, self, music)
         check_hit = self.ship_hit_floor(hit_wall_sound, check_hit)
         self.ship.move(pos)
         return check_hit
@@ -183,6 +194,7 @@ def main():
     bullet_img = pygame.image.load(os.path.join('data', 'mine-bullet.png')).convert_alpha()
     chicken_img = pygame.image.load(os.path.join('data', 'chicken.png')).convert_alpha()
     ship_img = pygame.image.load(os.path.join('data', 'spaceship.png')).convert_alpha()
+    bullet_explosion = pygame.image.load(os.path.join('data', 'explosion1.gif')).convert_alpha()
     game_over_img = pygame.image.load(os.path.join('data', 'game_over.png')).convert()
     start = pygame.image.load(os.path.join('data', 'space_invader.png')).convert()
     hit_wall_sound = pygame.mixer.Sound(os.path.join('data', 'hit_wall.wav'))
@@ -252,14 +264,14 @@ def main():
 
             # tang speed va giam thoi gian tao object
             if scoreboard.score != 0 and check_fps:
-                if scoreboard.score % 100 == 0:
+                if scoreboard.score % 1000 == 0:
+                    time_speed += 1
+                    check_fps = False
+                elif scoreboard.score % 100 == 0:
                     fps += 2
                     check_fps = False
-                elif scoreboard.score % 1000 == 0:
-                    time_speed += 2
-                    check_fps = False
-                else:
-                    check_fps = True
+            elif scoreboard.score % 100 != 0:
+                check_fps = True
             if bullet_cooldown > 100:
                 if scoreboard.score % 170 == 0 and check_last_time:
                     bullet_cooldown -= 50
@@ -269,7 +281,7 @@ def main():
                     check_last_time = True
 
             # cap nhat khung hinh
-            game.draw_arena(background, bullet_img, chicken_img, ship_img)
+            game.draw_arena(background, bullet_img, chicken_img, ship_img, bullet_explosion)
             check_hit = game.update(mouse_pos, boom_sound, hit_wall_sound, check_hit)
             pygame.display.update()
             fps_clock.tick(fps)
